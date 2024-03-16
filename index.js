@@ -11,13 +11,13 @@ const questions = [
       "View All Employee",
       "Add Employee",
       "Update Employee Role",
-      "View all roles",
+      "View All Roles",
       "Add Role",
       "View All Departments",
       "Add Department",
       "Update Employee Manager",
       "View Employees by Manager",
-      "View employees by department",
+      "View Employees by Department",
       "Delete Department",
       "Delete Roles",
       "Delete Employees",
@@ -45,6 +45,8 @@ function init() {
       viewAllDepartments();
     } else if (data.Initial === "Add Department") {
       addDepartment();
+    } else if (data.Initial === "Update Employee Manager") {
+      updateEmployeeManager();
     } else if (data.Initial === "Quit") {
       server.end();
     }
@@ -216,6 +218,7 @@ const addRole = async () => {
   }
 };
 
+// finish adding role
 const addRoleResume = async () => {
   try {
     const { newRole, salary } = await inquirer.prompt([
@@ -244,6 +247,7 @@ const addRoleResume = async () => {
   }
 };
 
+// view departments
 const viewAllDepartments = async () => {
   const [department] = await server
     .promise()
@@ -254,6 +258,7 @@ const viewAllDepartments = async () => {
   setTimeout(init, 3000);
 };
 
+// add department
 const addDepartment = async () => {
   try {
     const answer = await inquirer.prompt([
@@ -269,6 +274,67 @@ const addDepartment = async () => {
 
     console.log("Department has been added");
     viewAllDepartments();
+    setTimeout(init, 3000);
+  } catch (err) {
+    console.log(err);
+  }
+};
+
+const updateEmployeeManager = async () => {
+  try {
+    const [employeeSql] = await server
+      .promise()
+      .query(
+        "SELECT employees.manager_id, employees.id, employees.first_name, employees.last_name, role.title AS role, CONCAT(employees.first_name, ' ', employees.last_name) as employee FROM employees JOIN role ON employees.role_id = role.id"
+      );
+
+    const [employee] = await server.promise().query(employeeSql);
+
+    const newRole = employee.map((role) => ({
+      name: role.employees.employee,
+      title: role.role,
+      manager: role.employees.manager_id,
+    }));
+
+    const employeeName = await inquirer.prompt([
+      {
+        name: "chosenEmployee",
+        type: "list",
+        message: "Please choose an employee.",
+        choices: newRole,
+      },
+    ]);
+
+    const [managerSql] = await server
+      .promise()
+      .query(
+        "SELECT employees.manager_id, CONCAT(employees.first_name, ' ', employees.last_name) as Manager FROM employees"
+      );
+
+    const [manager] = await server.promise().query(managerSql);
+
+    const newManager = manager.map((role) => ({
+      name: role.Manager,
+      manager: role.manager_id,
+    }));
+
+    const managerName = await inquirer.prompt([
+      {
+        name: "chosenManager",
+        type: "list",
+        message: "Please choose an employee's manager.",
+        choices: newManager,
+      },
+    ]);
+
+    await server
+      .promise()
+      .query("UPDATE employees SET manager_id = ? WHERE id = ?", [
+        managerName.chosenManager,
+        employeeName.chosenEmployee,
+      ]);
+
+    console.log("Employee manager updated successfully.");
     setTimeout(init, 3000);
   } catch (err) {
     console.log(err);
