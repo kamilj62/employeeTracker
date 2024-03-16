@@ -43,6 +43,8 @@ function init() {
       addRole();
     } else if (data.Initial === "View All Departments") {
       viewAllDepartments();
+    } else if (data.Initial === "Add Department") {
+      addDepartment();
     } else if (data.Initial === "Quit") {
       server.end();
     }
@@ -123,60 +125,47 @@ const addEmployee = async () => {
 };
 
 // update employee role
+
 const updateEmployeeRole = async () => {
   try {
-    const answer_updateRole = await inquirer.prompt([
-      {
-        type: "input",
-        name: "firstName",
-        message: "What is the employee's first name?",
-      },
-      {
-        type: "input",
-        name: "lastName",
-        message: "What is the employee's last name?",
-      },
-    ]);
-    const roleChange = [
-      answer_updateRole.firstName,
-      answer_updateRole.lastName,
-    ];
-    const roleSql = `SELECT role.id, role.title FROM role`;
-    const [roleChoice] = await server.promise().query(roleSql);
-
-    const roles = roleChoice.map(({ id, title }) => ({
-      name: title,
-      value: id,
+    const employeeSql =
+      "SELECT employees.id, CONCAT(employees.first_name, ' ', employees.last_name) AS full_name FROM employees";
+    const [chosenEmployee] = await server.promise().query(employeeSql);
+    const employeeChoices = chosenEmployee.map((emp) => ({
+      name: emp.full_name,
+      value: emp.id,
     }));
-    const { role } = await inquirer.prompt([
-      {
-        type: "list",
-        name: "role",
-        message: "What is the employee's role?",
-        choices: roles,
-      },
-    ]);
-    roleChange.push(role);
-    const managerSql = `SELECT * FROM employees`;
-    const [managersData] = await server.promise().query(managerSql);
 
-    const managers = managersData.map(({ id, first_name, last_name }) => ({
-      name: first_name + " " + last_name,
-      value: id,
+    const roleSql = "SELECT role.id, role.title FROM role";
+    const [roles] = await server.promise().query(roleSql);
+    const roleChoices = roles.map((role) => ({
+      name: role.title,
+      value: role.id,
     }));
-    const { manager } = await inquirer.prompt([
+
+    const answers = await inquirer.prompt([
       {
+        name: "chosenEmployee",
         type: "list",
-        name: "manager",
-        message: "What is the employee's manager?",
-        choices: managers,
+        message: "Which employee has a new role?",
+        choices: employeeChoices,
+      },
+      {
+        name: "chosenRole",
+        type: "list",
+        message: "What is their new role?",
+        choices: roleChoices,
       },
     ]);
-    roleChange.push(manager);
-    const sql = `INSERT INTO employees (first_name, last_name, role_id, manager_id)
-            VALUES (?, ?, ?, ?)`;
-    await server.promise().query(sql, roleChange);
-    console.log("Employee Role has been changed");
+
+    await server
+      .promise()
+      .query("UPDATE employees SET role_id = ? WHERE id = ?", [
+        answers.chosenRole,
+        answers.chosenEmployee,
+      ]);
+
+    console.log("Employee role updated successfully.");
     setTimeout(init, 3000);
   } catch (err) {
     console.log(err);
@@ -189,7 +178,7 @@ const viewAllRoles = async () => {
     const [role] = await server
       .promise()
       .query(
-        "SELECT role.id, employees.first_name, employees.last_name, role.title FROM employees INNER JOIN role ON employees.role_id = role.id"
+        "SELECT role.id, employees.first_name, employees.last_name, role.title AS title FROM employees INNER JOIN role ON employees.role_id = role.id"
       );
 
     console.table(role);
@@ -202,21 +191,23 @@ const viewAllRoles = async () => {
 // add role
 const addRole = async () => {
   try {
-    const [deptNamesArray] = await server
+    const [deptNames] = await server
       .promise()
-      .query("SELECT department.department_name FROM department");
+      .query("SELECT department.department_name AS department FROM department");
+
+    const choices = deptNames.map((dept) => dept.department);
 
     const answer = await inquirer.prompt([
       {
         name: "departmentName",
         type: "list",
         message: "Which department is this new role in?",
-        choices: deptNamesArray,
+        choices: choices,
       },
     ]);
 
-    if (answer.departmentName === "Create Department") {
-      await addDepartment();
+    if (answer.departmentName === "") {
+      addDepartment();
     } else {
       await addRoleResume(answer);
     }
@@ -225,7 +216,7 @@ const addRole = async () => {
   }
 };
 
-const addRoleResume = async (departmentData) => {
+const addRoleResume = async () => {
   try {
     const { newRole, salary } = await inquirer.prompt([
       {
@@ -240,13 +231,13 @@ const addRoleResume = async (departmentData) => {
       },
     ]);
 
-    let departmentId;
-    response.forEach((department) => {
-      if (departmentData.departmentName === department.department_name) {
-        departmentId = department.id;
-      }
-    });
-
+    const [role] = await server
+      .promise()
+      .query(
+        "UPDATE employees JOIN role ON employees.role_id = role.id SET role.title = 'newRole', role.salary = salary WHERE role.id = employees.role_id;"
+      );
+    viewAllRoles();
+    setTimeout(init, 3000);
     // Add the new role to the database using departmentId, newRole, and salary
   } catch (error) {
     console.log(error);
@@ -263,5 +254,25 @@ const viewAllDepartments = async () => {
   setTimeout(init, 3000);
 };
 
+const addDepartment = async () => {
+  try {
+    const answer = await inquirer.prompt([
+      {
+        name: "newDepartment",
+        type: "input",
+        message: "What is the name of your new Department?",
+      },
+    ]);
+
+    let sql = `INSERT INTO department (department_name) VALUES (?)`;
+    await server.promise().query(sql, [answer.newDepartment]);
+
+    console.log("Department has been added");
+    viewAllDepartments();
+    setTimeout(init, 3000);
+  } catch (err) {
+    console.log(err);
+  }
+};
 // Function call to initialize app
 init();
