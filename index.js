@@ -28,7 +28,7 @@ const questions = [
   },
 ];
 
-// TODO: Create a function to initialize app
+// Create a function to initialize app
 function init() {
   inquirer.prompt(questions).then((data) => {
     if (data.Initial === "Add Employee") {
@@ -47,6 +47,10 @@ function init() {
       addDepartment();
     } else if (data.Initial === "Update Employee Manager") {
       updateEmployeeManager();
+    } else if (data.Initial === "View Employees by Manager") {
+      viewEmployeesByManager();
+    } else if (data.Initial === "View Employees by Department") {
+      viewEmployeesByDepartment();
     } else if (data.Initial === "Quit") {
       server.end();
     }
@@ -280,6 +284,7 @@ const addDepartment = async () => {
   }
 };
 
+// update employee's manager
 const updateEmployeeManager = async () => {
   try {
     const [employee] = await server
@@ -325,12 +330,66 @@ const updateEmployeeManager = async () => {
 
     await server
       .promise()
-      .query("UPDATE employees SET manager_id = ? WHERE id = ?;", [
-        employeeName.chosenEmployee,
+      .query("UPDATE employee SET manager_id = ? WHERE id = ?", [
+        //employeeName.chosenEmployee,
         managerName.chosenManager,
       ]);
 
     console.log("Employee manager updated successfully.");
+    setTimeout(init, 3000);
+  } catch (err) {
+    console.log(err);
+  }
+};
+
+// view employees by manager
+const viewEmployeesByManager = async () => {
+  try {
+    const [managerList] = await server
+      .promise()
+      .query(
+        "SELECT DISTINCT employees.manager_id, CONCAT(employees.first_name, ' ', employees.last_name) as Manager FROM employees JOIN employees AS manager ON employees.manager_id = manager.id WHERE employees.manager_id IS NOT NULL;"
+      );
+
+    const list = managerList.map((role) => ({
+      name: role.Manager,
+      manager: role.manager_id,
+    }));
+    const listOfManagers = await inquirer.prompt([
+      {
+        name: "listManager",
+        type: "list",
+        message: "Please choose the manager.",
+        choices: list,
+      },
+    ]);
+    console.table(listOfManagers);
+    setTimeout(init, 3000);
+  } catch (err) {
+    console.log(err);
+  }
+};
+
+const viewEmployeesByDepartment = async () => {
+  try {
+    const [employees] = await server
+      .promise()
+      .query(
+        "SELECT employees.first_name, employees.last_name, department.name AS departmentName FROM department LEFT JOIN role ON employees.role_id = role.id LEFT JOIN department ON role.department_id = department.id"
+      );
+
+    const employeeList = employees.map((role) => ({
+      departmentName: role.departmentName,
+    }));
+    const listOfEmployeess = await inquirer.prompt([
+      {
+        name: "listManager",
+        type: "list",
+        message: "Please choose the department.",
+        choices: employeeList,
+      },
+    ]);
+    console.table(listOfEmployeess);
     setTimeout(init, 3000);
   } catch (err) {
     console.log(err);
