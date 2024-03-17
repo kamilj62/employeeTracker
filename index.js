@@ -2,7 +2,7 @@ const inquirer = require("inquirer");
 const fs = require("fs");
 const server = require("./server");
 
-// TODO: Create an array of questions for user input
+// Create an array of questions for user input
 const questions = [
   {
     type: "list",
@@ -282,18 +282,16 @@ const addDepartment = async () => {
 
 const updateEmployeeManager = async () => {
   try {
-    const [employeeSql] = await server
+    const [employee] = await server
       .promise()
       .query(
-        "SELECT employees.manager_id, employees.id, employees.first_name, employees.last_name, role.title AS role, CONCAT(employees.first_name, ' ', employees.last_name) as employee FROM employees JOIN role ON employees.role_id = role.id"
+        `SELECT employees.manager_id, employees.id, employees.first_name, employees.last_name, role.title AS role, CONCAT(employees.first_name, ' ', employees.last_name) as employee FROM employees JOIN role ON employees.role_id = role.id`
       );
 
-    const [employee] = await server.promise().query(employeeSql);
-
     const newRole = employee.map((role) => ({
-      name: role.employees.employee,
+      name: role.employee,
       title: role.role,
-      manager: role.employees.manager_id,
+      manager: role.manager_id,
     }));
 
     const employeeName = await inquirer.prompt([
@@ -305,13 +303,11 @@ const updateEmployeeManager = async () => {
       },
     ]);
 
-    const [managerSql] = await server
+    const [manager] = await server
       .promise()
       .query(
         "SELECT employees.manager_id, CONCAT(employees.first_name, ' ', employees.last_name) as Manager FROM employees"
       );
-
-    const [manager] = await server.promise().query(managerSql);
 
     const newManager = manager.map((role) => ({
       name: role.Manager,
@@ -322,16 +318,16 @@ const updateEmployeeManager = async () => {
       {
         name: "chosenManager",
         type: "list",
-        message: "Please choose an employee's manager.",
+        message: "Please choose the employee's manager.",
         choices: newManager,
       },
     ]);
 
     await server
       .promise()
-      .query("UPDATE employees SET manager_id = ? WHERE id = ?", [
-        managerName.chosenManager,
+      .query("UPDATE employees SET manager_id = ? WHERE id = ?;", [
         employeeName.chosenEmployee,
+        managerName.chosenManager,
       ]);
 
     console.log("Employee manager updated successfully.");
