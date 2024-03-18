@@ -37,7 +37,7 @@ function init() {
       viewAllEmployee();
     } else if (data.Initial === "Update Employee Role") {
       updateEmployeeRole();
-    } else if (data.Initial === "View all roles") {
+    } else if (data.Initial === "View All Roles") {
       viewAllRoles();
     } else if (data.Initial === "Add Role") {
       addRole();
@@ -51,6 +51,10 @@ function init() {
       viewEmployeesByManager();
     } else if (data.Initial === "View Employees by Department") {
       viewEmployeesByDepartment();
+    } else if (data.Initial === "Delete Department") {
+      deleteDepartment();
+    } else if (data.Initial === "Delete Roles") {
+      deleteRoles();
     } else if (data.Initial === "Quit") {
       server.end();
     }
@@ -131,7 +135,6 @@ const addEmployee = async () => {
 };
 
 // update employee role
-
 const updateEmployeeRole = async () => {
   try {
     const employeeSql =
@@ -181,16 +184,16 @@ const updateEmployeeRole = async () => {
 // view all roles
 const viewAllRoles = async () => {
   try {
-    const [role] = await server
-      .promise()
-      .query(
-        "SELECT role.id, employees.first_name, employees.last_name, role.title AS title FROM employees INNER JOIN role ON employees.role_id = role.id"
-      );
+    const [rolesWithDepartments] = await server.promise().query(`
+        SELECT role.id, role.title, department.department_name AS department_name
+        FROM role
+        INNER JOIN department ON role.department_id = department.id
+      `);
 
-    console.table(role);
+    console.table(rolesWithDepartments);
     setTimeout(init, 3000);
-  } catch (err) {
-    console.log(err);
+  } catch (error) {
+    console.log(error);
   }
 };
 
@@ -330,9 +333,9 @@ const updateEmployeeManager = async () => {
 
     await server
       .promise()
-      .query("UPDATE employee SET manager_id = ? WHERE id = ?", [
-        //employeeName.chosenEmployee,
-        managerName.chosenManager,
+      .query(`UPDATE employees SET manager_id = ? WHERE id = ?`, [
+        managerName,
+        employeeName,
       ]);
 
     console.log("Employee manager updated successfully.");
@@ -348,11 +351,11 @@ const viewEmployeesByManager = async () => {
     const [managerList] = await server
       .promise()
       .query(
-        "SELECT DISTINCT employees.manager_id, CONCAT(employees.first_name, ' ', employees.last_name) as Manager FROM employees JOIN employees AS manager ON employees.manager_id = manager.id WHERE employees.manager_id IS NOT NULL;"
+        "SELECT employees.id, employees.first_name, employees.last_name, role.title AS role, CONCAT(manager.first_name, ' ', manager.last_name) as manager FROM employees LEFT JOIN role ON employees.role_id = role.id LEFT JOIN employees manager ON employees.manager_id = manager.id"
       );
 
     const list = managerList.map((role) => ({
-      name: role.Manager,
+      name: role.manager,
       manager: role.manager_id,
     }));
     const listOfManagers = await inquirer.prompt([
@@ -375,24 +378,107 @@ const viewEmployeesByDepartment = async () => {
     const [employees] = await server
       .promise()
       .query(
-        "SELECT employees.first_name, employees.last_name, department.name AS departmentName FROM department LEFT JOIN role ON employees.role_id = role.id LEFT JOIN department ON role.department_id = department.id"
+        "SELECT employees.first_name, employees.last_name, CONCAT(employees.first_name, ' ', employees.last_name) as employee_name, department.name AS departmentName FROM department JOIN role ON employees.role_id = role.id JOIN department ON role.department_id = department.id"
       );
 
-    const employeeList = employees.map((role) => ({
-      departmentName: role.departmentName,
+    const employeeList = employees.map((employee) => ({
+      departmentName: employee.departmentName,
+      employeeName: employee.employee_name,
     }));
-    const listOfEmployeess = await inquirer.prompt([
+
+    const listOfEmployees = await inquirer.prompt([
       {
-        name: "listManager",
+        name: "listEmployees",
         type: "list",
         message: "Please choose the department.",
         choices: employeeList,
       },
     ]);
-    console.table(listOfEmployeess);
+
+    console.table(listOfEmployees);
     setTimeout(init, 3000);
   } catch (err) {
     console.log(err);
+  }
+};
+
+// delete selected department
+const deleteDepartment = async () => {
+  try {
+    const chooseDepartmentQuery = "SELECT id, department_name FROM department";
+    const [chosenDepartment] = await server
+      .promise()
+      .query(chooseDepartmentQuery);
+
+    const departmentList = chosenDepartment.map((department) => ({
+      id: department.id,
+      departmentName: department.department_name,
+    }));
+
+    const department = departmentList.map(
+      (department) => department.departmentName
+    );
+
+    const { departmentId } = await inquirer.prompt([
+      {
+        name: "departmentId",
+        type: "list",
+        message: "Please choose the department to delete:",
+        choices: department,
+      },
+    ]);
+
+    const selectedDepartment = departmentList.find(
+      (dept) => dept.departmentName === departmentId
+    );
+
+    if (selectedDepartment) {
+      const deleteDepartmentQuery = `DELETE FROM department WHERE id = ?`;
+      await server
+        .promise()
+        .query(deleteDepartmentQuery, [selectedDepartment.id]);
+
+      console.log("Department has been deleted");
+      viewAllRoles();
+      setTimeout(init, 3000);
+    } else {
+      console.log("Department not found. Please select a valid department.");
+    }
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const deleteRoles = async () => {
+  const roleToDeleteQuery = "SELECT role.title, role.id FROM role";
+  const [chosenDelete] = await server.promise().query(roleToDeleteQuery);
+
+  const toDelete = chosenDelete.map((role) => ({
+    title: role.title,
+    id: role.id,
+  }));
+
+  const deleteRole = toDelete.map((role) => role.title);
+
+  const { roleId } = await inquirer.prompt([
+    {
+      name: "roleId",
+      type: "list",
+      message: "Please choose the role to delete:",
+      choices: deleteRole,
+    },
+  ]);
+
+  const selectedRole = chosenDelete.find((role) => role.id === roleId);
+
+  if (selectedRole) {
+    const deleteRoleQuery = "DELETE FROM role WHERE id = ?";
+    await server.promise().query(deleteRoleQuery, [selectedRole.id]);
+
+    console.log("Role has been deleted");
+    // Call the appropriate functions here
+  } else {
+    console.log("Role not found. Please select a valid role.");
   }
 };
 // Function call to initialize app
