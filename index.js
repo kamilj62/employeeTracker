@@ -28,7 +28,7 @@ const questions = [
   },
 ];
 
-// Create a function to initialize app
+// Create a function to initialize app; investigate switch case
 function init() {
   inquirer.prompt(questions).then((data) => {
     if (data.Initial === "Add Employee") {
@@ -55,6 +55,10 @@ function init() {
       deleteDepartment();
     } else if (data.Initial === "Delete Roles") {
       deleteRoles();
+    } else if (data.Initial === "Delete Employees") {
+      deleteEmployee();
+    } else if (data.Initial === "View the total utilized budget") {
+      viewTotalBudget();
     } else if (data.Initial === "Quit") {
       server.end();
     }
@@ -63,14 +67,18 @@ function init() {
 
 // view all employees
 const viewAllEmployee = async () => {
-  const [employees] = await server
-    .promise()
-    .query(
-      "SELECT employees.id, employees.first_name, employees.last_name, role.title AS role, CONCAT(manager.first_name, ' ', manager.last_name) as manager FROM employees LEFT JOIN role ON employees.role_id = role.id LEFT JOIN employees manager ON employees.manager_id = manager.id"
-    );
+  try {
+    const [employees] = await server
+      .promise()
+      .query(
+        "SELECT employees.id, employees.first_name, employees.last_name, role.title AS role, CONCAT(manager.first_name, ' ', manager.last_name) as manager FROM employees LEFT JOIN role ON employees.role_id = role.id LEFT JOIN employees manager ON employees.manager_id = manager.id"
+      );
 
-  console.table(employees);
-  setTimeout(init, 3000);
+    console.table(employees);
+    setTimeout(init, 3000);
+  } catch (error) {
+    console.log(error);
+  }
 };
 
 // add employee
@@ -355,18 +363,20 @@ const updateEmployeeManager = async () => {
 // view employees by manager
 const viewEmployeesByManager = async () => {
   try {
-    const [managerList] = await server
-      .promise()
-      .query(
-        "SELECT employees.id, CONCAT(employees.first_name, ' ',employees.last_name) as employee, role.title AS role, CONCAT(manager.first_name, ' ', manager.last_name) as manager FROM employees LEFT JOIN role ON employees.role_id = role.id LEFT JOIN employees manager ON employees.manager_id = manager.id"
-      );
-
+    const [managerList] = await server.promise().query(
+      `SElECT CONCAT(e.first_name, ' ',e.last_name) as employee, m.manager_id 
+        FROM employees e 
+        JOIN employees m ON e.id = m.manager_id`
+    );
     const managers = managerList.map((role) => ({
-      name: role.manager,
-      manager: role.manager_id,
-      employee: role.employee,
+      name: role.employee,
+      value: {
+        name: role.employee,
+        managerId: role.manager_id,
+      },
     }));
-    const listOfManagers = await inquirer.prompt([
+
+    const selectedManager = await inquirer.prompt([
       {
         name: "listManager",
         type: "list",
@@ -374,11 +384,13 @@ const viewEmployeesByManager = async () => {
         choices: managers,
       },
     ]);
-
+    console.log(selectedManager);
     const [employeeList] = await server.promise().query(`
-        SELECT employees.id AS id, CONCAT(employees.first_name, ' ', employees.last_name) AS employee, role.title AS role
+        SELECT employees.id AS id, CONCAT(employees.first_name, ' ', employees.last_name) AS employee, manager_id
         FROM employees
-        LEFT JOIN role ON employees.role_id = role.id;`);
+        WHERE employees.manager_id = ${selectedManager.listManager.managerId}
+        `);
+    console.log(employeeList);
 
     const listOfEmployees = employeeList.map((role) => ({
       employee: role.employee,
@@ -394,27 +406,48 @@ const viewEmployeesByManager = async () => {
 
 const viewEmployeesByDepartment = async () => {
   try {
-    const [employees] = await server
-      .promise()
-      .query(
-        "SELECT employees.first_name, employees.last_name, CONCAT(employees.first_name, ' ', employees.last_name) as employee_name, department.name AS departmentName FROM department JOIN role ON employees.role_id = role.id JOIN department ON role.department_id = department.id"
-      );
+    const [departmentName] = await server.promise()
+      .query(`SELECT department.id, department_name, employees.id, CONCAT(employees.first_name, ' ', employees.last_name) AS employee
+      FROM department
+      JOIN role ON department.id = role.department_id
+      JOIN employees ON role.id = employees.role_id;
+    `);
 
-    const employeeList = employees.map((employee) => ({
-      departmentName: employee.departmentName,
-      employeeName: employee.employee_name,
+    console.log(departmentName);
+
+    const employeeList = departmentName.map((department) => ({
+      departmentName: department.department_name,
+      employeeName: department.employee,
+      value: {
+        departmentName: department.department_name,
+        departmentId: department.id,
+      },
     }));
 
-    const listOfEmployees = await inquirer.prompt([
+    const departments = employeeList.map((employee) => employee.departmentName);
+
+    const { selectedDepartment } = await inquirer.prompt([
       {
-        name: "listEmployees",
+        name: "selectedDepartment",
         type: "list",
         message: "Please choose the department.",
-        choices: employeeList,
+        choices: departments,
       },
     ]);
 
-    console.table(listOfEmployees);
+    console.log("employeelist", employeeList);
+
+    const employeeName = employeeList.map((person) => ({
+      name: person.employeeName,
+      departmentID: person.value.departmentId,
+    }));
+
+    const filteredEmployees = employeeList.filter(
+      (employee) => employee.departmentName === selectedDepartment
+    );
+
+    console.log("Employees in department:", selectedDepartment);
+    console.table(filteredEmployees);
     setTimeout(init, 3000);
   } catch (err) {
     console.log(err);
@@ -474,35 +507,27 @@ const deleteRoles = async () => {
       .query(`SELECT role.id, role.title FROM role`);
 
     const toDelete = chosenDelete.map((role) => ({
-      title: role.title,
       id: role.id,
+      title: role.title,
     }));
 
     const roleTitles = toDelete.map((role) => role.title);
 
-    console.log("Available Roles:");
-    console.log(roleTitles);
-
     const { roleId } = await inquirer.prompt([
       {
-        name: "roleTitle",
+        name: "roleId",
         type: "list",
         message: "Please choose the role to delete",
         choices: roleTitles,
       },
     ]);
 
-    console.log("Selected Role ID:");
-    console.log(roleId);
-
-    const selectedRole = chosenDelete.find((role) => role.title === roleId);
-
-    console.log("Selected Role:");
-    console.log(selectedRole);
+    const selectedRole = toDelete.find((role) => role.title === roleId);
 
     if (selectedRole) {
       const deleteRoleQuery = "DELETE FROM role WHERE id = ?";
       await server.promise().query(deleteRoleQuery, [selectedRole.id]);
+
       console.log("Role has been deleted");
       viewAllRoles();
     } else {
@@ -512,5 +537,59 @@ const deleteRoles = async () => {
     console.error(error);
   }
 };
+
+const deleteEmployee = async () => {
+  try {
+    const [employees] = await server
+      .promise()
+      .query(
+        `SELECT id, CONCAT(first_name, ' ', last_name) AS employee FROM employees`
+      );
+
+    const employeeDelete = employees.map((employee) => ({
+      name: employee.employee,
+      value: employee.id,
+    }));
+
+    const { id } = await inquirer.prompt([
+      {
+        type: "list",
+        name: "id",
+        message: "Select the employee you want to delete:",
+        choices: employeeDelete,
+      },
+    ]);
+
+    const selectedEmployee = employeeDelete.find(
+      (employee) => employee.value === id
+    );
+
+    if (selectedEmployee) {
+      const deleteEmployeeQuery = `DELETE FROM employees WHERE id = ?`;
+      await server.promise().query(deleteEmployeeQuery, [id]);
+
+      console.log("Employee has been deleted");
+      viewAllEmployee();
+    } else {
+      console.log("Employee not found.");
+    }
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+const viewTotalBudget = async () => {
+  try {
+    const budget = await server.promise().query(`
+    SELECT SUM(salary) AS total_revenue
+FROM role;
+  `);
+
+    console.log(budget);
+  } catch (error) {
+    console.log(error);
+  }
+};
+
 // Function call to initialize app
 init();
