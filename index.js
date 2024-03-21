@@ -1,5 +1,4 @@
 const inquirer = require("inquirer");
-const fs = require("fs");
 const server = require("./server");
 
 // Create an array of questions for user input
@@ -65,7 +64,7 @@ function init() {
   });
 }
 
-// view all employees
+// View all employees
 const viewAllEmployee = async () => {
   try {
     const [employees] = await server
@@ -81,7 +80,7 @@ const viewAllEmployee = async () => {
   }
 };
 
-// add employee
+// Add employee
 const addEmployee = async () => {
   try {
     const answer = await inquirer.prompt([
@@ -142,7 +141,7 @@ const addEmployee = async () => {
   }
 };
 
-// update employee role
+// Update employee role
 const updateEmployeeRole = async () => {
   try {
     const employeeSql =
@@ -189,7 +188,7 @@ const updateEmployeeRole = async () => {
   }
 };
 
-// view all roles
+// View all roles
 const viewAllRoles = async () => {
   try {
     const [rolesWithDepartments] = await server.promise().query(`
@@ -205,7 +204,7 @@ const viewAllRoles = async () => {
   }
 };
 
-// add role
+// Add role
 const addRole = async () => {
   try {
     const [deptNames] = await server
@@ -233,7 +232,7 @@ const addRole = async () => {
   }
 };
 
-// finish adding role
+// Finish adding role
 const addRoleResume = async () => {
   try {
     const { newRole, salary } = await inquirer.prompt([
@@ -262,7 +261,7 @@ const addRoleResume = async () => {
   }
 };
 
-// view departments
+// View departments
 const viewAllDepartments = async () => {
   const [department] = await server
     .promise()
@@ -273,7 +272,7 @@ const viewAllDepartments = async () => {
   setTimeout(init, 3000);
 };
 
-// add department
+// Add department
 const addDepartment = async () => {
   try {
     const answer = await inquirer.prompt([
@@ -295,7 +294,7 @@ const addDepartment = async () => {
   }
 };
 
-// update employee's manager
+// Update employee's manager
 const updateEmployeeManager = async () => {
   try {
     // Fetch all employees
@@ -360,7 +359,7 @@ const updateEmployeeManager = async () => {
   }
 };
 
-// view employees by manager
+// View employees by manager
 const viewEmployeesByManager = async () => {
   try {
     const [managerList] = await server.promise().query(
@@ -404,6 +403,7 @@ const viewEmployeesByManager = async () => {
   }
 };
 
+// View employeess by Department they are in
 const viewEmployeesByDepartment = async () => {
   try {
     const [departmentName] = await server.promise()
@@ -454,7 +454,7 @@ const viewEmployeesByDepartment = async () => {
   }
 };
 
-// delete selected department
+// Delete selected department
 const deleteDepartment = async () => {
   try {
     const [chosenDepartment] = await server
@@ -500,6 +500,7 @@ const deleteDepartment = async () => {
   }
 };
 
+// Delete role
 const deleteRoles = async () => {
   try {
     const [chosenDelete] = await server
@@ -530,6 +531,7 @@ const deleteRoles = async () => {
 
       console.log("Role has been deleted");
       viewAllRoles();
+      setTimeout(init, 3000);
     } else {
       console.log("Role not found. Please select a valid role.");
     }
@@ -538,6 +540,7 @@ const deleteRoles = async () => {
   }
 };
 
+// Delete Employee
 const deleteEmployee = async () => {
   try {
     const [employees] = await server
@@ -570,6 +573,7 @@ const deleteEmployee = async () => {
 
       console.log("Employee has been deleted");
       viewAllEmployee();
+      setTimeout(init, 3000);
     } else {
       console.log("Employee not found.");
     }
@@ -578,6 +582,7 @@ const deleteEmployee = async () => {
   }
 };
 
+// Total Budget
 const viewTotalBudget = async () => {
   try {
     const budget = await server.promise().query(`
@@ -586,6 +591,7 @@ FROM role;
   `);
 
     console.log(budget);
+    setTimeout(init, 3000);
   } catch (error) {
     console.log(error);
   }
