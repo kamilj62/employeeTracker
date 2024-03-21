@@ -586,8 +586,11 @@ const deleteEmployee = async () => {
 const viewTotalBudget = async () => {
   try {
     const budget = await server.promise().query(`
-    SELECT SUM(salary) AS total_revenue
-FROM role;
+    SELECT title, salary
+    FROM role
+    UNION ALL
+    SELECT 'Total Salary', SUM(salary)
+    FROM role;
   `);
 
     console.log(budget);
